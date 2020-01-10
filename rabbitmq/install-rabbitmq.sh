@@ -3,21 +3,33 @@
 # 스크립트 얻는법 : wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/rabbitmq/install-rabbitmq.sh
 # 공식 문서 참고 https://www.rabbitmq.com/install-rpm.html
 
-# Setup Extra Packages for Enterprise Linux (EPEL)
+echo "** Setup Extra Packages for Enterprise Linux (EPEL) **"
 yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
-# Install Erlang
 # Erlang package from the EPEL Repository
+echo "** Install Erlang **"
 yum -y install erlang
 
-# Install RabbitMQ Server
 # Using Bintray Yum Repository
-rpm --import https://github.com/rabbitmq/signing-keys/releases/download/2.0/rabbitmq-release-signing-key.asc
-wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/rabbitmq/rabbitmq.repo -P /etc/yum.repos.d/
-yum -y install rabbitmq-server
+echo "** Install RabbitMQ Server **"
+RABBIT_MQ_REPO_DIR=/etc/yum.repos.d
 
-# To start the daemon by default when the system boots, as an administrator run
+if [ ! -f $RABBIT_MQ_REPO_DIR/rabbitmq.repo ]; then
+  rpm --import https://github.com/rabbitmq/signing-keys/releases/download/2.0/rabbitmq-release-signing-key.asc
+  wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/rabbitmq/rabbitmq.repo -P $RABBIT_MQ_REPO_DIR/
+  yum -y install rabbitmq-server
+else
+	echo "** $RABBIT_MQ_REPO_DIR/rabbitmq.repo already exists **"
+fi
+
+echo "** To start the daemon by default when the system boots, as an administrator run **"
 systemctl enable rabbitmq-server.service
 
-# Setup OS limits
-wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/rabbitmq/limits.conf -P /etc/systemd/system/rabbitmq-server.service.d/
+echo "** Setup OS limits **"
+ETC_SYSTEMD_SYSTEM_RABBITMQ_SERVER_DIR=/etc/systemd/system/rabbitmq-server.service.d
+
+if [ ! -f $ETC_SYSTEMD_SYSTEM_RABBITMQ_SERVER_DIR/limits.conf ]; then
+  wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/rabbitmq/limits.conf -P $ETC_SYSTEMD_SYSTEM_RABBITMQ_SERVER_DIR/
+else
+	echo "** $ETC_SYSTEMD_SYSTEM_RABBITMQ_SERVER_DIR/limits.conf already exists **"
+fi
