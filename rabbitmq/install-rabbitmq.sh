@@ -1,7 +1,10 @@
 #!/bin/bash
 # CentOS 8 에서 RabbitMQ 설치를 위한 스크립트
 # 스크립트 얻는법 : wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/rabbitmq/install-rabbitmq.sh
-# 공식 문서 참고 https://www.rabbitmq.com/install-rpm.html
+# 공식 문서 참고 : https://www.rabbitmq.com/install-rpm.html
+
+echo "* Update installed package *"
+yum -y upgrade
 
 echo "* Setup Extra Packages for Enterprise Linux (EPEL) *"
 yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
