@@ -39,3 +39,13 @@ fi
 
 echo "* Enable Management Plugin *"
 rabbitmq-plugins enable rabbitmq_management
+
+echo "* Add administrator user *"
+rabbitmqctl add_user admin wkrenakstp@
+rabbitmqctl set_user_tags admin administrator
+
+echo "* Modify Firewall *"
+firewall-cmd --add-port={5672,15672}/tcp --permanent
+firewall-cmd --reload
+
+# Management 사이트에서 이후 admin 계정에 / virtualhost 생성 및 queue 생성 필요
