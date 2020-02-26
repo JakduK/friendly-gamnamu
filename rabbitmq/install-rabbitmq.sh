@@ -48,4 +48,4 @@ echo "* Modify Firewall *"
 firewall-cmd --add-port={5672,15672}/tcp --permanent
 firewall-cmd --reload
 
-# Management 사이트에서 이후 admin 계정에 / virtualhost 생성 및 queue 생성 필요
+# 이후 Management 사이트에서 admin 계정에 / virtualhost 생성 및 queue 생성 필요

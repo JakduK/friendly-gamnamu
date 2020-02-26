@@ -2,6 +2,14 @@
 # CentOS 8 에서 Elasticsearch 7.x 설치를 위한 스크립트
 # 스크립트 얻는법 : wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/elasticsearch/install-elasticsearch.sh
 # 공식 문서 참고 : https://www.elastic.co/guide/en/elasticsearch/reference/current/rpm.html
+* 노리 플러그인 : https://www.elastic.co/guide/en/elasticsearch/plugins/7.6/analysis-nori.html
+
+echo "* Setup hosts *"
+if ! grep -q ".jakduk" /etc/hosts; then
+	sudo /sbin/runuser -l root -c "echo '192.168.0.18 elasticsearch5.jakduk' >> /etc/hosts"
+else
+    echo "** elasticsearch.jakduk host config already exists /etc/hosts path **"
+fi
 
 echo "* Update installed package *"
 yum -y upgrade
@@ -24,3 +32,12 @@ echo "* Running Elasticsearch with systemd *"
 systemctl daemon-reload
 systemctl enable elasticsearch.service
 systemctl start elasticsearch.service
+
+echo "* Install Korean (nori) Analysis Plugin *"
+/usr/share/elasticsearch/bin/elasticsearch-plugin install analysis-nori
+
+echo "* Modify Firewall *"
+firewall-cmd --add-port=9200/tcp --permanent
+firewall-cmd --reload
+
+# 이후 /etc/elasticsearch/elasticsearch.yml 과 /etc/elasticsearch/jvm.options 설정 등이 필요함.

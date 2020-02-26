@@ -3,6 +3,14 @@
 # 스크립트 얻는법 : wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/mongodb/install-mongodb.sh
 # 공식 문서 참고 : https://docs.mongodb.com/manual/tutorial/install-mongodb-on-red-hat/
 
+echo "* Setup hosts *"
+if ! grep -q ".jakduk" /etc/hosts; then
+	sudo /sbin/runuser -l root -c "echo '192.168.0.12 mongodb1.jakduk' >> /etc/hosts"
+	sudo /sbin/runuser -l root -c "echo '192.168.0.12 mongodb3.jakduk' >> /etc/hosts"
+else
+    echo "** mongodb.jakduk host config already exists /etc/hosts path **"
+fi
+
 echo "* Update installed package *"
 yum -y upgrade
 
@@ -40,13 +48,4 @@ echo "* Start MongoDB. *"
 systemctl start mongod
 systemctl enable mongod
 
-echo "* Setup hosts *"
-
-if ! grep -q ".jakduk" /etc/hosts; then
-	sudo /sbin/runuser -l root -c "echo '192.168.0.12 mongodb1.jakduk' >> /etc/hosts"
-	sudo /sbin/runuser -l root -c "echo '192.168.0.12 mongodb3.jakduk' >> /etc/hosts"
-else
-    echo "** mongodb.jakduk host config already exists /etc/hosts path **"
-fi
-
-# /etc/mongod.conf 수정 및 mongo 터미널 들어가서, rs.conf() 등 설정 필요 함.
+# 이후 /etc/mongod.conf 수정 및 mongo 터미널 들어가서, rs.conf() 등 설정 필요 함.
