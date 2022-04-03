@@ -1,6 +1,8 @@
 #!/bin/bash
 # CentOS 8 에서 JAKDUK-API Application 초기화를 위한 스크립트
 # 스크립트 얻는법 : wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/jakduk-api/initialize-jakduk-api-whth-vm.sh
+# SpringBoot Installation as a systemd Service : https://docs.spring.io/spring-boot/docs/2.4.13/reference/html/deployment.html#deployment-systemd-service
+# SpringBoot Executable Jars : https://docs.spring.io/spring-boot/docs/2.4.13/reference/html/appendix-executable-jar-format.html#executable-jar
 
  if [ "$#" -eq  "0" ]
    then
@@ -10,6 +12,7 @@
  fi
 
 PROFILE=$1
+WORKING_DIR=/usr/local/jakduk-api
 
 echo "* Add jakduk user *"
 if ! grep -q "jakduk" /etc/passwd; then
@@ -42,21 +45,27 @@ else
     echo "WARN : jakduk user id_rsa.pub already exists .ssh/authorized_keys"
 fi
 
-echo "* Setup jakduk working directory *"
-if [ ! -d /jakduk ]; then
-  mkdir /jakduk
-  mkdir /jakduk/api
-  mkdir /jakduk/storage
-  chown -R jakduk:jakduk /jakduk
+echo "* Setup jakduk-api working directory *"
+if [ ! -d $WORKING_DIR ]; then
+  mkdir $WORKING_DIR
+  chown -R jakduk:jakduk $WORKING_DIR
 else
-	echo "WARN : /jakduk directory already exists"
+	echo "WARN : /jakduk-api directory already exists"
+fi
+
+echo "* Setup jakduk-stoarge working directory *"
+if [ ! -d /usr/local/jakduk-stoarge ]; then
+  mkdir /usr/local/jakduk-stoarge
+  chown -R jakduk:jakduk /usr/local/jakduk-stoarge
+else
+	echo "WARN : /jakduk-stoarge directory already exists"
 fi
 
 echo "* Setup jakduk stoarge mount *"
 yum install -y nfs-utils
 
-if ! grep -q "jakduk/storage" /etc/fstab ; then
-  sudo /sbin/runuser -l root -c "echo '192.168.0.9:/storage /jakduk/storage nfs defaults 0 0' >> /etc/fstab"
+if ! grep -q "jakduk-storage" /etc/fstab ; then
+  sudo /sbin/runuser -l root -c "echo '192.168.0.9:/storage /usr/local/jakduk-storage nfs defaults 0 0' >> /etc/fstab"
   sudo /sbin/runuser -l root -c "mount -a"
 else
     echo "WARN : jakduk stoarge mount already exists /etc/fstab"
@@ -77,8 +86,8 @@ fi
 
 echo "* Setup jakduk-api conf file *"
 
-if [ ! -f /jakduk/api/jakduk-api-1.0.0.conf ]; then
-  sudo /sbin/runuser -l jakduk -c "echo 'export JAVA_OPTS=\"-Dspring.profiles.active=$PROFILE -Dfile.encoding=UTF-8 -Xms512m -Xmx512m\"' > /jakduk/api/jakduk-api-1.0.0.conf"
+if [ ! -f $WORKING_DIR/jakduk-api-1.0.0.conf ]; then
+  sudo /sbin/runuser -l jakduk -c "echo 'export JAVA_OPTS=\"-Dspring.profiles.active=$PROFILE -Dfile.encoding=UTF-8 -Xms512m -Xmx512m\"' > $WORKING_DIR/jakduk-api-1.0.0.conf"
 else
 	echo "WARN : jakduk-api-1.0.0.conf already exists"
 fi
