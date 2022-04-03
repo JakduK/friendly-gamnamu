@@ -1,0 +1,11 @@
+[Unit]
+Description=JAKDUK-API Application
+After=syslog.target
+
+[Service]
+User=jakduk
+ExecStart=/jakduk/api/jakduk-api-0.1.0.jar
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
