@@ -2,6 +2,15 @@
 # CentOS 8 에서 JAKDUK-API Application 초기화를 위한 스크립트
 # 스크립트 얻는법 : wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/jakduk-api/initialize-jakduk-api-whth-vm.sh
 
+ if [ "$#" -eq  "0" ]
+   then
+     echo "Input profile argument. e.g. dev, prod"
+ else
+     echo "PROFILE : $1"
+ fi
+
+PROFILE=$1
+
 echo "* Add jakduk user *"
 if ! grep -q "jakduk" /etc/passwd; then
 	sudo useradd jakduk
@@ -43,16 +52,6 @@ else
 	echo "WARN : /jakduk directory already exists"
 fi
 
-echo "* Setup jakduk working directory *"
-if [ ! -d /jakduk ]; then
-  mkdir /jakduk
-  mkdir /jakduk/api
-  mkdir /jakduk/storage
-  chown -R jakduk:jakduk /jakduk
-else
-	echo "WARN : /jakduk directory already exists"
-fi
-
 echo "* Setup jakduk stoarge mount *"
 yum install -y nfs-utils
 
@@ -63,6 +62,9 @@ else
     echo "WARN : jakduk stoarge mount already exists /etc/fstab"
 fi
 
+echo "* Install JDK 1.8 *"
+yum install -y java-1.8.0-openjdk.x86_64
+
 echo "* Setup jakduk-api service for systemd *"
 SYSTEMD_DIR=/etc/systemd/system
 
@@ -71,4 +73,12 @@ if [ ! -f $SYSTEMD_DIR/jakduk-api.service ]; then
   systemctl enable jakduk-api.service
 else
 	echo "WARN : $SYSTEMD_DIR/jakduk-api.service already exists"
+fi
+
+echo "* Setup jakduk-api conf file *"
+
+if [ ! -f /jakduk/api/jakduk-api-1.0.0.conf ]; then
+  sudo /sbin/runuser -l jakduk -c "echo 'export JAVA_OPTS=\"-Dspring.profiles.active=$PROFILE -Dfile.encoding=UTF-8 -Xms512m -Xmx512m\"' > /jakduk/api/jakduk-api-1.0.0.conf"
+else
+	echo "WARN : jakduk-api-1.0.0.conf already exists"
 fi
