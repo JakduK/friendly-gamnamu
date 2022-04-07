@@ -1,0 +1,5 @@
+Cmnd_Alias JAKDUK_API = /usr/bin/systemctl * jakduk-api
+Cmnd_Alias JAKDUK_BATCH = /usr/bin/systemctl * jakduk-batch
+Cmnd_Alias RM = /bin/rm
+
+jakduk ALL=(ALL) NOPASSWD:JAKDUK_API,JAKDUK_BATCH,RM
