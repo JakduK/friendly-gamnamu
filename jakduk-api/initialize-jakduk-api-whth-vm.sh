@@ -91,3 +91,7 @@ if [ ! -f $WORKING_DIR/jakduk-api-1.0.0.conf ]; then
 else
 	echo "WARN : jakduk-api-1.0.0.conf already exists"
 fi
+
+echo "* Modify Firewall *"
+firewall-cmd --add-port=8080/tcp --permanent
+firewall-cmd --reload
