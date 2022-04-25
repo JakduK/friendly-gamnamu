@@ -14,3 +14,18 @@ yum update -y
 
 echo "* Install OpenVPN. *"
 yum install -y openvpn
+
+echo "* Download Easy RSA latest version. *"
+wget https://github.com/OpenVPN/easy-rsa/archive/v3.0.8.tar.gz
+tar -xf v3.0.8.tar.gz
+rm -f v3.0.8.tar.gz
+mkdir -p /etc/openvpn/easy-rsa
+mv easy-rsa-3.0.8 /etc/openvpn/easy-rsa
+
+echo "* Setup server.conf files *"
+OPEN_VPN_CONF_DIR=/etc/openvpn
+if [ ! -f $OPEN_VPN_CONF_DIR/server.conf ]; then
+  wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/open-vpn/server.conf -P /etc/openvpn
+else
+	echo "WARN : OpenVPN server.conf files already exists"
+fi
