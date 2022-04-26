@@ -24,11 +24,44 @@ mv easy-rsa-3.0.8 /etc/openvpn/easy-rsa
 echo "* Create key for HMAC firewall *"
 openvpn --genkey --secret /etc/openvpn/ta.key
 
-echo "* Setup server.conf files *"
+echo "* Setup server.conf file. *"
 OPEN_VPN_CONF_DIR=/etc/openvpn
+
 if [ ! -f $OPEN_VPN_CONF_DIR/server.conf ]; then
-  wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/open-vpn/server.conf -P /etc/openvpn
+  wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/open-vpn/server.conf -P $OPEN_VPN_CONF_DIR
 else
-	echo "WARN : OpenVPN server.conf files already exists"
+	echo "WARN : OpenVPN server.conf file already exists"
 fi
 
+echo "* Setup vars file. *"
+
+if [ ! -f $OPEN_VPN_CONF_DIR/easy-rsa/easyrsa3 ]; then
+  wget https://raw.githubusercontent.com/JakduK/friendly-gamnamu/master/open-vpn/vars -P $OPEN_VPN_CONF_DIR/easy-rsa/easyrsa3
+else
+	echo "WARN : OpenVPN vars file already exists"
+fi
+
+echo "* Building the certificate authority. *"
+# CA 는 직접 입력 필요 e.g. openvpn.jakduk.dev
+/etc/openvpn/easy-rsa/easyrsa3 build-ca nopass
+
+echo "* Create a key and certificate for the server. *"
+# PEM pass phrase는 직접 입력 필요
+/etc/openvpn/easy-rsa/easyrsa3 build-server-full server
+
+echo "* Generate a Diffie-Hellman key exchange file. *"
+/etc/openvpn/easy-rsa/easyrsa3 gen-dh
+
+echo "* Create a certificate and key for client1. *"
+# PEM pass phrase는 직접 입력 필요
+/etc/openvpn/easy-rsa/easyrsa3 build-client-full client1
+
+echo "* Copy key and certificate files to /etc/openvpn *"
+cp /etc/openvpn/easy-rsa/easyrsa3/pki/ca.crt /etc/openvpn/easy-rsa/easyrsa3/pki/dh.pem /etc/openvpn
+cp /etc/openvpn/easy-rsa/easyrsa3/pki/private/ca.key /etc/openvpn/easy-rsa/easyrsa3/pki/private/server.key /etc/openvpn
+
+echo "* Modify Firewall *"
+firewall-cmd --zone=public --add-service openvpn
+firewall-cmd --zone=public --add-service openvpn --permanent
+firewall-cmd --add-masquerade
+firewall-cmd --add-masquerade --permanent
