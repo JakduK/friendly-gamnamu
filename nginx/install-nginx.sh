@@ -21,6 +21,7 @@ if ! grep -q ".jakduk" /etc/hosts; then
 	sudo /sbin/runuser -l root -c "echo '192.168.0.8 jenkins.jakduk' >> /etc/hosts"
 	sudo /sbin/runuser -l root -c "echo '192.168.0.15 rabbitmq2.jakduk' >> /etc/hosts"
 	sudo /sbin/runuser -l root -c "echo '192.168.0.7 dev-api2.jakduk' >> /etc/hosts"
+	sudo /sbin/runuser -l root -c "echo '192.168.0.27 web-dev.jakduk' >> /etc/hosts"
 else
     echo "WARN : jakduk host config already exists /etc/hosts path"
 fi
