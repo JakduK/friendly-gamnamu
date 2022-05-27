@@ -45,12 +45,14 @@ openvpn --genkey --secret /etc/openvpn/myvpn.tlsauth
 
 echo "* Building the certificate authority. *"
 cd /etc/openvpn/easy-rsa/easyrsa3
+./easyrsa clean-all
+rm -f /etc/openvpn/easy-rsa/easyrsa3/pki/vars
 # CA 는 직접 입력 필요 e.g. openvpn.jakduk.dev
 ./easyrsa build-ca nopass
 
 echo "* Create a key and certificate for the server. *"
 # PEM pass phrase는 직접 입력 필요
-./easyrsa build-server-full server
+./easyrsa build-server-full server nopass
 
 echo "* Generate a Diffie-Hellman key exchange file. *"
 ./easyrsa gen-dh
@@ -74,5 +76,6 @@ firewall-cmd --zone=public --add-service openvpn --permanent
 echo "* Enable OpenVPN *"
 systemctl start openvpn@server.service
 # systemd-tty-ask-password-agent 를 실행해서 비밀번호를 넣어야 한다.
-systemctl enable openvpn@server.service
+# ./easyrsa build-server-full server nopass 로 하면 안해도 됨
+# systemctl enable openvpn@server.service
 
