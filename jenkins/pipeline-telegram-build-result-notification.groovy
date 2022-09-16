@@ -4,7 +4,18 @@ import hudson.model.Result
 /**
  * 텔레그램 bot api token, chat id 설정 방법.
  * Job Configure -> This project is parameterized 체크 -> String Parameter "BOT_API_TOKEN", "CHAT_ID" 추가 -> 기본값 입력
- * 주의사항! pipeline parameter 사용하면 안됩니다.
+ * 주의사항! 위 파라미터들이 pipeline parameter에 있으면 안됩니다. 기본값이 바뀝니다.
+ *
+ * In-process Script Approval 필수 허용 항목들.
+ * - method hudson.model.Cause getShortDescription
+ * - method hudson.model.Job getBuildByNumber int
+ * - method hudson.model.Run getCauses
+ * - method hudson.model.Run getDurationString
+ * - method hudson.model.Run getResult
+ * - method hudson.model.Run getUrl
+ * - method jenkins.model.Jenkins getItemByFullName java.lang.String
+ * - method jenkins.model.Jenkins getRootUrl
+ * - staticMethod jenkins.model.Jenkins getInstanceOrNull
  */
 
 pipeline {
@@ -30,25 +41,24 @@ def sendForUpstreamBuilds(build) {
     }
 }
 
-@NonCPS
 def getResult(cause) {
     def jenkins = Jenkins.getInstanceOrNull()
     if (jenkins) {
         def upstreamProject = jenkins.getItemByFullName(cause.upstreamProject)
         def upstreamBuild = upstreamProject?.getBuildByNumber(cause.upstreamBuild)
         if (!upstreamProject) {
-            return escapeSpecialLetter("${cause.upstreamProject} not found.")
+            return "${cause.upstreamProject} not found."
         } else if (!upstreamBuild) {
             def url = "${jenkins.rootUrl}${upstreamProject.url}"
-            def title = escapeSpecialLetter("${cause.upstreamProject} #${cause.upstreamBuild}")
-            return "[${title}](${url})" + escapeSpecialLetter(" not found.")
+            def title = "${cause.upstreamProject} #${cause.upstreamBuild}"
+            return "[${title}](${url}) not found."
         } else {
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
-            def title = escapeSpecialLetter(upstreamBuild.fullDisplayName)
             def marker = getMarker(upstreamBuild.result)
-            def message = escapeSpecialLetter("Build ${upstreamBuild.result.toString().toLowerCase()}.")
-            def elapsed = escapeSpecialLetter("`${upstreamBuild.durationString} elapsed.`")
-            def startedBy = escapeSpecialLetter("${upstreamBuild.getCauses().collect {"`${it.shortDescription}`"}.join(",\n")}.")
+            def title = upstreamBuild.fullDisplayName
+            def message = "Build ${upstreamBuild.result.toString().toLowerCase()}."
+            def elapsed = "`${upstreamBuild.durationString} elapsed.`"
+            def startedBy = "${upstreamBuild.getCauses().collect {"`${it.shortDescription}`"}.join(",\n")}."
             return [
                 "[${marker} ${title}](${url})",
                 message,
@@ -57,7 +67,7 @@ def getResult(cause) {
             ].findAll {it}.join("\n")
         }
     } else {
-        return escapeSpecialLetter("Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent.")
+        return "Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent."
     }
 }
 
@@ -70,17 +80,15 @@ curl 'https://api.telegram.org/bot${params.BOT_API_TOKEN}/sendMessage' \
 -d '{\
         "chat_id\":\"${params.CHAT_ID}\",
         \"parse_mode\":\"MarkdownV2\",
-        \"text\":\"${message}\"
+        \"text\":\"${escapeSpecialLetter(message)}\"
     }'
 """
 }
 
-@NonCPS
 def escapeSpecialLetter(str) {
-    return str.replaceAll(/([#-.])/, '\\\\\\\\$1').replaceAll(/(["])/, '\\\\$1')
+    return str.replaceAll(/([.#-])/, '\\\\\\\\$1').replaceAll(/(["])/, '\\\\$1')
 }
 
-@NonCPS
 def getMarker(result) {
     switch (result) {
         case Result.SUCCESS: return "🟢"

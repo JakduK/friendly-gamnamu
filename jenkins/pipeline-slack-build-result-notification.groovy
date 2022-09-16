@@ -5,7 +5,18 @@ import hudson.model.Result
  * 슬랙 웹훅URL 설정 방법.
  * Job Configure -> This project is parameterized 체크
  * -> Multi-line String Parameter "COMMON_WEB_HOOKS", "SUCCESS_WEB_HOOKS", "FAILURE_WEB_HOOKS" 추가 -> 기본값 입력
- * 주의사항! pipeline parameter 사용하면 안됩니다.
+ * 주의사항! 위 파라미터들이 pipeline parameter에 있으면 안됩니다. 기본값이 바뀝니다.
+ *
+ * In-process Script Approval 필수 허용 항목들.
+ * - method hudson.model.Cause getShortDescription
+ * - method hudson.model.Job getBuildByNumber int
+ * - method hudson.model.Run getCauses
+ * - method hudson.model.Run getDurationString
+ * - method hudson.model.Run getResult
+ * - method hudson.model.Run getUrl
+ * - method jenkins.model.Jenkins getItemByFullName java.lang.String
+ * - method jenkins.model.Jenkins getRootUrl
+ * - staticMethod jenkins.model.Jenkins getInstanceOrNull
  */
 
 pipeline {
@@ -23,7 +34,7 @@ pipeline {
 }
 
 def sendForUpstreamBuilds(build) {
-    for(cause in build.getBuildCauses()) {
+    for (cause in build.getBuildCauses()) {
         if (cause._class.contains("UpstreamCause")) {
             def result = getResult(cause)
             send(result, split(params.COMMON_WEB_HOOKS))
@@ -36,7 +47,6 @@ def sendForUpstreamBuilds(build) {
     }
 }
 
-@NonCPS
 def getResult(cause) {
     def jenkins = Jenkins.getInstanceOrNull()
     if (jenkins) {
@@ -108,7 +118,6 @@ curl ${webHook} \
     }
 }
 
-@NonCPS
 def getStatusColor(status) {
     switch (status) {
         case Result.SUCCESS: return "#2eb886"
@@ -117,11 +126,10 @@ def getStatusColor(status) {
     }
 }
 
-@NonCPS
 def escapeSpecialLetter(str) {
     return str.replaceAll(/(["])/, '\\\\$1')
 }
 
-@NonCPS split(str) {
+def split(str) {
     return str ? str.split("\n") : []
 }
