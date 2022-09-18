@@ -2,9 +2,12 @@ import jenkins.model.Jenkins
 import hudson.model.Result
 
 /**
- * 텔레그램 bot api token, chat id 설정 방법.
- * Job Configure -> This project is parameterized 체크 -> String Parameter "BOT_API_TOKEN", "CHAT_ID" 추가 -> 기본값 입력
- * 주의사항! 위 파라미터들이 pipeline parameter에 있으면 안됩니다. 기본값이 바뀝니다.
+ * 빌드 결과 텔레그램 알림.
+ * 주의사항! 아래 파라미터들이 pipeline parameters에 있으면 안됩니다. 기본값이 바뀝니다.
+ * 파라미터 설정.
+ * - Job Configure -> This project is parameterized 체크. 추가후 기본값 입력.
+ * - String Parameter "BOT_API_TOKEN" : 텔레그램 bot api token.
+ * - String Parameter "CHAT_ID" : 텔레그램 채팅방 아이디.
  *
  * In-process Script Approval 필수 허용 항목들.
  * - method hudson.model.Cause getShortDescription
