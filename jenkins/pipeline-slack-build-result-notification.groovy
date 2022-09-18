@@ -6,9 +6,9 @@ import hudson.model.Result
  * 주의사항! 아래 파라미터들이 pipeline parameters에 있으면 안됩니다. 기본값이 바뀝니다.
  * 파라미터 설정.
  * - Job Configure -> This project is parameterized 체크. 추가후 기본값 입력.
- * - Multi-line String Parameter "COMMON_WEB_HOOKS" : 빌드 결과 전송 웹훅 URL.
- * - Multi-line String Parameter "SUCCESS_WEB_HOOKS" : 성공시 전송 웹훅 URL.
- * - Multi-line String Parameter "FAILURE_WEB_HOOKS" : 실패시 전송 웹훅 URL.
+ * - Multi-line String Parameter "COMMON_WEB_HOOK_URLS" : 빌드 결과 전송 웹훅 URL.
+ * - Multi-line String Parameter "SUCCESS_WEB_HOOK_URLS" : 성공시 전송 웹훅 URL.
+ * - Multi-line String Parameter "FAILURE_WEB_HOOK_URLS" : 실패시 전송 웹훅 URL.
  *
  * In-process Script Approval 필수 허용 항목들.
  * - method hudson.model.Cause getShortDescription
@@ -40,11 +40,11 @@ def sendForUpstreamBuilds(build) {
     for (cause in build.getBuildCauses()) {
         if (cause._class.contains("UpstreamCause")) {
             def result = getResult(cause)
-            send(result, split(params.COMMON_WEB_HOOKS))
+            send(result, split(params.COMMON_WEB_HOOK_URLS))
             if (result.status == Result.SUCCESS) {
-                send(result, split(params.SUCCESS_WEB_HOOKS))
+                send(result, split(params.SUCCESS_WEB_HOOK_URLS))
             } else if (result.status == Result.FAILURE) {
-                send(result, split(params.FAILURE_WEB_HOOKS))
+                send(result, split(params.FAILURE_WEB_HOOK_URLS))
             }
         }
     }
