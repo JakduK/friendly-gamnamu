@@ -2,10 +2,13 @@ import jenkins.model.Jenkins
 import hudson.model.Result
 
 /**
- * 슬랙 웹훅URL 설정 방법.
- * Job Configure -> This project is parameterized 체크
- * -> Multi-line String Parameter "COMMON_WEB_HOOKS", "SUCCESS_WEB_HOOKS", "FAILURE_WEB_HOOKS" 추가 -> 기본값 입력
- * 주의사항! 위 파라미터들이 pipeline parameter에 있으면 안됩니다. 기본값이 바뀝니다.
+ * 빌드 결과 슬랙 알림.
+ * 주의사항! 아래 파라미터들이 pipeline parameters에 있으면 안됩니다. 기본값이 바뀝니다.
+ * 파라미터 설정.
+ * - Job Configure -> This project is parameterized 체크. 추가후 기본값 입력.
+ * - Multi-line String Parameter "COMMON_WEB_HOOKS" : 빌드 결과 전송 웹훅 URL.
+ * - Multi-line String Parameter "SUCCESS_WEB_HOOKS" : 성공시 전송 웹훅 URL.
+ * - Multi-line String Parameter "FAILURE_WEB_HOOKS" : 실패시 전송 웹훅 URL.
  *
  * In-process Script Approval 필수 허용 항목들.
  * - method hudson.model.Cause getShortDescription
