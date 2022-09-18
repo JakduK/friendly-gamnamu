@@ -3,11 +3,16 @@ import hudson.model.Result
 
 /**
  * 빌드 결과 텔레그램 알림.
- * 주의사항! 아래 파라미터들이 pipeline parameters에 있으면 안됩니다. 기본값이 바뀝니다.
+ *
  * 파라미터 설정.
- * - Job Configure -> This project is parameterized 체크. 추가후 기본값 입력.
+ * 주의사항! 아래 파라미터들이 pipeline parameters에 있으면 안됩니다. 기본값이 바뀝니다.
+ * - Job Configure -> This project is parameterized 체크. 파라미터 추가후 기본값 입력.
  * - String Parameter "BOT_API_TOKEN" : 텔레그램 bot api token.
  * - String Parameter "CHAT_ID" : 텔레그램 채팅방 아이디.
+ *
+ * 알림 받을 잡 관리.
+ * Build Triggers -> Build after other projects are built 체크 -> Trigger even if the build fails 체크.
+ * Projects to watch 알림 받을 잡 등록.
  *
  * In-process Script Approval 필수 허용 항목들.
  * - method hudson.model.Cause getShortDescription
