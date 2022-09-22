@@ -17,11 +17,14 @@ import hudson.model.Result
  *
  * In-process Script Approval 필수 허용 항목들.
  * - method hudson.model.Cause getShortDescription
+ * - method hudson.model.Item getUrl
  * - method hudson.model.Job getBuildByNumber int
  * - method hudson.model.Run getCauses
  * - method hudson.model.Run getDurationString
  * - method hudson.model.Run getResult
  * - method hudson.model.Run getUrl
+ * - method jenkins.scm.RunWithSCM getChangeSets
+ * - method hudson.plugins.git.GitChangeSet getAuthorEmail
  * - method jenkins.model.Jenkins getItemByFullName java.lang.String
  * - method jenkins.model.Jenkins getRootUrl
  * - staticMethod jenkins.model.Jenkins getInstanceOrNull
@@ -63,7 +66,8 @@ def getResult(cause) {
         if (!upstreamProject) {
             return [
                 status:Result.FAILURE,
-                title:"[${Result.FAILURE}] ${cause.upstreamProject} not found."
+                title:"[${Result.FAILURE}] ${cause.upstreamProject}",
+                message:"Project not found.",
             ]
         } else if (!upstreamBuild) {
             def url = "${jenkins.rootUrl}${upstreamProject.url}"
@@ -72,36 +76,44 @@ def getResult(cause) {
                 status:Result.FAILURE,
                 title:title,
                 url:url,
-                message:"Build not found."
+                message:"Build not found.",
             ]
         } else {
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
             def title = "[${upstreamBuild.result}] ${upstreamBuild.fullDisplayName}"
             def elapsed = "_${upstreamBuild.durationString} elapsed._"
-            def startedBy = "${upstreamBuild.getCauses().collect {"_${it.shortDescription}_"}.join(",\n")}."
+            def startedBy = "${upstreamBuild.getCauses().collect {"‣ _${it.shortDescription}_"}.join(",\n")}."
+            def changes = upstreamBuild.getChangeSets().collect {change ->
+                return change.getItems().collect {item ->
+                    return "‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail})"
+                }.join("\n")
+            }.join("\n")
             return [
-                status: upstreamBuild.result,
-                title: title,
-                url: url,
+                status:upstreamBuild.result,
+                title:title,
+                url:url,
                 message: [
                     elapsed,
                     startedBy,
-                ].findAll {it}.join("\n")
+                ].findAll {it}.join("\n"),
+                changes: changes,
             ]
         }
     } else {
         return [
             status:Result.FAILURE,
-            title:"Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent."
+            title:"Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent.",
+            message:"Unavailable.",
         ]
     }
 }
 
 def send(result, webHooks) {
-    def color = "\"color\": \"${getStatusColor(result.status)}\""
-    def title = "\"title\": \"${escapeSpecialLetter(result.title)}\""
-    def url = result.url ? "\"title_link\": \"${result.url}\"" : null
-    def message = result.message ? "\"text\": \"${escapeSpecialLetter(result.message)}\"" : null
+    def color = getStatusColor(result.status)
+    def url = result.url ? result.url : ""
+    def title = escapeSpecialLetter(result.title)
+    def message = escapeSpecialLetter(result.message)
+    def changes = escapeSpecialLetter(result.changes)
     for (webHook in webHooks) {
         sh """
 curl ${webHook} \
@@ -109,16 +121,34 @@ curl ${webHook} \
 -X POST \
 -H 'content-type: application/json' \
 -d '{
-    \"attachments\": [
+    \"blocks\": [
         {
-            ${
-                [
-                    color,
-                    title,
-                    url,
-                    message
-                ].findAll {it}.join(',')
-            }
+			\"type\":\"section\",
+			\"text\":{
+				\"type\":\"mrkdwn\",
+				\"text\":\"*${url ? "<${url}|${title}>" : title}*\"
+			}
+		}
+    ],
+    \"attachments\":[
+        {
+            \"color\":\"${color}\",
+            \"blocks\":[
+                {
+                    \"type\":\"section\",
+                    \"text\":{
+                        \"type\":\"mrkdwn\",
+                        \"text\":\"${message}\"
+                    }
+                },
+                {
+                    \"type\":\"section\",
+                    \"text\":{
+                        \"type\":\"mrkdwn\",
+                        \"text\":\"*Changes*\\n${changes}\"
+                    }
+                }
+            ]
         }
     ]
 }'
@@ -135,9 +165,9 @@ def getStatusColor(status) {
 }
 
 def escapeSpecialLetter(str) {
-    return str.replaceAll(/(["])/, '\\\\$1')
+    return str ? str.trim().replaceAll(/(["])/, '\\\\$1') : ""
 }
 
 def split(str) {
-    return str ? str.split("\n") : []
+    return str ? str.trim().split("\n").findAll {it.trim() ? true : false} : []
 }

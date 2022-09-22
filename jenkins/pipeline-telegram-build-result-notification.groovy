@@ -16,11 +16,14 @@ import hudson.model.Result
  *
  * In-process Script Approval 필수 허용 항목들.
  * - method hudson.model.Cause getShortDescription
+ * - method hudson.model.Item getUrl
  * - method hudson.model.Job getBuildByNumber int
  * - method hudson.model.Run getCauses
  * - method hudson.model.Run getDurationString
  * - method hudson.model.Run getResult
  * - method hudson.model.Run getUrl
+ * - method jenkins.scm.RunWithSCM getChangeSets
+ * - method hudson.plugins.git.GitChangeSet getAuthorEmail
  * - method jenkins.model.Jenkins getItemByFullName java.lang.String
  * - method jenkins.model.Jenkins getRootUrl
  * - staticMethod jenkins.model.Jenkins getInstanceOrNull
@@ -55,24 +58,34 @@ def getResult(cause) {
         def upstreamProject = jenkins.getItemByFullName(cause.upstreamProject)
         def upstreamBuild = upstreamProject?.getBuildByNumber(cause.upstreamBuild)
         if (!upstreamProject) {
-            return "${cause.upstreamProject} not found."
+            return escapeSpecialLetter("${cause.upstreamProject} not found.")
         } else if (!upstreamBuild) {
             def url = "${jenkins.rootUrl}${upstreamProject.url}"
             def title = "${cause.upstreamProject} #${cause.upstreamBuild}"
-            return "[${title}](${url}) not found."
+            return "[${escapeSpecialLetter(title)}](${url}) ${escapeSpecialLetter("not found.")}"
         } else {
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
             def marker = getMarker(upstreamBuild.result)
             def title = upstreamBuild.fullDisplayName
             def message = "Build ${upstreamBuild.result.toString().toLowerCase()}."
-            def elapsed = "`${upstreamBuild.durationString} elapsed.`"
-            def startedBy = "${upstreamBuild.getCauses().collect {"`${it.shortDescription}`"}.join(",\n")}."
+            def elapsed = "${upstreamBuild.durationString} elapsed."
+            def startedBy = "${upstreamBuild.getCauses().collect {"‣ `${it.shortDescription}`"}.join(",\n")}."
+            def changes = upstreamBuild.getChangeSets().collect {change ->
+                return change.getItems().collect {item ->
+                    return "‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail})"
+                }.join("\n")
+            }.join("\n")
             return [
-                "[${marker} ${title}](${url})",
-                message,
-                elapsed,
-                startedBy,
-            ].findAll {it}.join("\n")
+                "[${marker} ${escapeSpecialLetter(title)}](${url})",
+                escapeSpecialLetter(message),
+                escapeSpecialLetter(elapsed),
+                escapeSpecialLetter(startedBy),
+                escapeSpecialLetter([
+                    "",
+                    "*Changes*",
+                    changes,
+                ].join("\n")),
+            ].findAll {it -> it ? true : false}.join("\n")
         }
     } else {
         return "Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent."
@@ -88,13 +101,13 @@ curl 'https://api.telegram.org/bot${params.BOT_API_TOKEN}/sendMessage' \
 -d '{\
         "chat_id\":\"${params.CHAT_ID}\",
         \"parse_mode\":\"MarkdownV2\",
-        \"text\":\"${escapeSpecialLetter(message)}\"
+        \"text\":\"${message}\"
     }'
 """
 }
 
 def escapeSpecialLetter(str) {
-    return str.replaceAll(/([.#-])/, '\\\\\\\\$1').replaceAll(/(["])/, '\\\\$1')
+    return str ? str.replaceAll(/([#\-.()])/, '\\\\\\\\$1').replaceAll(/(["])/, '\\\\$1') : ""
 }
 
 def getMarker(result) {
