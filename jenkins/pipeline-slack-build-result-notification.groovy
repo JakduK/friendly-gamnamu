@@ -1,5 +1,6 @@
 import jenkins.model.Jenkins
 import hudson.model.Result
+import hudson.model.ParametersAction
 
 /**
  * 빌드 결과 슬랙 알림.
@@ -16,9 +17,13 @@ import hudson.model.Result
  * Projects to watch 알림 받을 잡 등록.
  *
  * In-process Script Approval 필수 허용 항목들.
+ * - method hudson.model.Actionable getAction java.lang.Class
  * - method hudson.model.Cause getShortDescription
  * - method hudson.model.Item getUrl
  * - method hudson.model.Job getBuildByNumber int
+ * - method hudson.model.ParameterValue getName
+ * - method hudson.model.ParameterValue getValue
+ * - method hudson.model.ParametersAction getParameters
  * - method hudson.model.Run getCauses
  * - method hudson.model.Run getDurationString
  * - method hudson.model.Run getResult
@@ -72,6 +77,7 @@ def getResult(cause) {
         } else if (!upstreamBuild) {
             def url = "${jenkins.rootUrl}${upstreamProject.url}"
             def title = "[${Result.FAILURE}] ${cause.upstreamProject} #${cause.upstreamBuild}"
+
             return [
                 status:Result.FAILURE,
                 title:title,
@@ -79,15 +85,20 @@ def getResult(cause) {
                 message:"Build not found.",
             ]
         } else {
+            def parameterList = upstreamBuild.getAction(ParametersAction)
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
             def title = "[${upstreamBuild.result}] ${upstreamBuild.fullDisplayName}"
             def elapsed = "_${upstreamBuild.durationString} elapsed._"
             def startedBy = "${upstreamBuild.getCauses().collect {"‣ _${it.shortDescription}_"}.join(",\n")}."
+            def parameters = (parameterList ? parameterList.getParameters() : []).collect{param ->
+                return "** ${param.name} **\n${param.value}"
+            }
             def changes = upstreamBuild.getChangeSets().collect {change ->
                 return change.getItems().collect {item ->
                     return "‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail})"
-                }.join("\n")
-            }.join("\n")
+                }
+            }.flatten()
+
             return [
                 status:upstreamBuild.result,
                 title:title,
@@ -95,7 +106,8 @@ def getResult(cause) {
                 message: [
                     elapsed,
                     startedBy,
-                ].findAll {it}.join("\n"),
+                ].join("\n"),
+                parameters: parameters,
                 changes: changes,
             ]
         }
@@ -113,45 +125,75 @@ def send(result, webHooks) {
     def url = result.url ? result.url : ""
     def title = escapeSpecialLetter(result.title)
     def message = escapeSpecialLetter(result.message)
-    def changes = escapeSpecialLetter(result.changes)
+    def parameters = result.parameters
+    def changes = result.changes
     for (webHook in webHooks) {
         sh """
 curl ${webHook} \
 -s \
 -X POST \
 -H 'content-type: application/json' \
--d '{
-    \"blocks\": [
+-d "{
+    \\"blocks\\":[
         {
-			\"type\":\"section\",
-			\"text\":{
-				\"type\":\"mrkdwn\",
-				\"text\":\"*${url ? "<${url}|${title}>" : title}*\"
+			\\"type\\":\\"section\\",
+			\\"text\\":{
+				\\"type\\":\\"mrkdwn\\",
+				\\"text\\":\\"*${url ? "<${url}|${title}>" : title}*\\"
 			}
 		}
     ],
-    \"attachments\":[
+    \\"attachments\\":[
         {
-            \"color\":\"${color}\",
-            \"blocks\":[
+            \\"color\\":\\"${color}\\",
+            \\"blocks\\":[
                 {
-                    \"type\":\"section\",
-                    \"text\":{
-                        \"type\":\"mrkdwn\",
-                        \"text\":\"${message}\"
+                    \\"type\\":\\"section\\",
+                    \\"text\\":{
+                        \\"type\\":\\"mrkdwn\\",
+                        \\"text\\":\\"${message}\\"
                     }
                 },
                 {
-                    \"type\":\"section\",
-                    \"text\":{
-                        \"type\":\"mrkdwn\",
-                        \"text\":\"*Changes*\\n${changes}\"
+                    \\"type\\":\\"section\\",
+                    \\"text\\":{
+                        \\"type\\":\\"mrkdwn\\",
+                        \\"text\\":\\"*Build Parameters*\\"
                     }
+                },
+                ${!parameters ? "" :
+                """
+                {
+                    \\"type\\":\\"section\\",
+                    \\"text\\":{
+                        \\"type\\":\\"mrkdwn\\",
+                        \\"text\\":\\"${escapeSpecialLetter("```${parameters.join("\n\n")}```")}\\"
+                    }
+                },
+                """
+                }
+                {
+                    \\"type\\":\\"section\\",
+                    \\"text\\":{
+                        \\"type\\":\\"mrkdwn\\",
+                        \\"text\\":\\"*Changes*\\"
+                    }
+                }
+                ${!changes ? "" :
+                """
+                ,{
+                    \\"type\\":\\"section\\",
+                    \\"text\\":{
+                        \\"type\\":\\"mrkdwn\\",
+                        \\"text\\":\\"${escapeSpecialLetter(changes.join("\n"))}\\"
+                    }
+                }
+                """
                 }
             ]
         }
     ]
-}'
+}"
 """
     }
 }
@@ -165,7 +207,10 @@ def getStatusColor(status) {
 }
 
 def escapeSpecialLetter(str) {
-    return str ? str.trim().replaceAll(/(["])/, '\\\\$1') : ""
+    return !str ? "" :
+        str.trim()
+        .replaceAll(/(["!\\])/, '\\\\\\\\\\\\$1')
+        .replaceAll(/([`])/, '\\\\$1')
 }
 
 def split(str) {
