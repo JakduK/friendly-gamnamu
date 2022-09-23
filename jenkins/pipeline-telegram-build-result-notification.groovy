@@ -15,9 +15,13 @@ import hudson.model.Result
  * Projects to watch 알림 받을 잡 등록.
  *
  * In-process Script Approval 필수 허용 항목들.
+ * - method hudson.model.Actionable getAction java.lang.Class
  * - method hudson.model.Cause getShortDescription
  * - method hudson.model.Item getUrl
  * - method hudson.model.Job getBuildByNumber int
+ * - method hudson.model.ParameterValue getName
+ * - method hudson.model.ParameterValue getValue
+ * - method hudson.model.ParametersAction getParameters
  * - method hudson.model.Run getCauses
  * - method hudson.model.Run getDurationString
  * - method hudson.model.Run getResult
@@ -62,52 +66,72 @@ def getResult(cause) {
         } else if (!upstreamBuild) {
             def url = "${jenkins.rootUrl}${upstreamProject.url}"
             def title = "${cause.upstreamProject} #${cause.upstreamBuild}"
+
             return "[${escapeSpecialLetter(title)}](${url}) ${escapeSpecialLetter("not found.")}"
         } else {
+            def parameterList = upstreamBuild.getAction(ParametersAction)
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
             def marker = getMarker(upstreamBuild.result)
             def title = upstreamBuild.fullDisplayName
             def message = "Build ${upstreamBuild.result.toString().toLowerCase()}."
             def elapsed = "${upstreamBuild.durationString} elapsed."
             def startedBy = "${upstreamBuild.getCauses().collect {"‣ `${it.shortDescription}`"}.join(",\n")}."
+            def parameters = (parameterList ? parameterList.getParameters() : []).collect{param ->
+                return "`‣ ${param.name} : ${param.value} `"
+            }
             def changes = upstreamBuild.getChangeSets().collect {change ->
                 return change.getItems().collect {item ->
-                    return "‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail})"
-                }.join("\n")
-            }.join("\n")
+                    return "`‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail}) `"
+                }
+            }.flatten()
+
             return [
-                "[${marker} ${escapeSpecialLetter(title)}](${url})",
-                escapeSpecialLetter(message),
-                escapeSpecialLetter(elapsed),
-                escapeSpecialLetter(startedBy),
-                escapeSpecialLetter([
-                    "",
-                    "*Changes*",
-                    changes,
-                ].join("\n")),
-            ].findAll {it -> it ? true : false}.join("\n")
+                title:"${marker} ${title}",
+                url:url,
+                message: [
+                    message,
+                    elapsed,
+                    startedBy,
+                ].join("\n"),
+                parameters: parameters,
+                changes: changes,
+            ]
         }
     } else {
         return "Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent."
     }
 }
 
-def send(message) {
+def send(result) {
     sh """
 curl 'https://api.telegram.org/bot${params.BOT_API_TOKEN}/sendMessage' \
 -s \
 -X POST \
 -H 'content-type: application/json' \
--d '{\
-        "chat_id\":\"${params.CHAT_ID}\",
-        \"parse_mode\":\"MarkdownV2\",
-        \"text\":\"${message}\"
-    }'
+-d "{
+        \\"chat_id\\":\\"${params.CHAT_ID}\\",
+        \\"parse_mode\\":\\"MarkdownV2\\",
+        \\"text\\":\\"${
+        """
+[${escapeSpecialLetter(result.title)}](${escapeSpecialLetter(result.url)})
+${escapeSpecialLetter(result.message)}
+
+*Build Parameters*
+${!result.parameters ? "" : "${escapeSpecialLetter(result.parameters.join("\n"))}\n"}
+*Changes*
+${escapeSpecialLetter(result.changes.join("\n"))}
+        """
+        }\\"
+    }"
 """
 }
 
 def escapeSpecialLetter(str) {
-    return str ? str.replaceAll(/([#\-.()])/, '\\\\\\\\$1').replaceAll(/(["])/, '\\\\$1') : ""
+    return !str ? "" :
+    str.trim()
+    .replaceAll(/(["!\\])/, '\\\\\\\\\\\\$1')
+    .replaceAll(/([#.\-_*|+(){}<>])/, '\\\\\\\\\\\\\\\\$1')
+    .replaceAll(/([`])/, '\\\\$1')
 }
 
 def getMarker(result) {
