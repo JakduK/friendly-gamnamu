@@ -119,7 +119,7 @@ def getResult(cause) {
 def send(result, webHooks) {
     def color = getStatusColor(result.status)
     for (webHook in webHooks) {
-        sh """set -x
+        sh """
 curl '${webHook}' \
 -s \
 -X POST \
