@@ -40,15 +40,15 @@ pipeline {
         stage("Send") {
             steps {
                 script {
-                    sendForUpstreamBuilds(currentBuild)
+                    sendUpstreamBuildResult(currentBuild)
                 }
             }
         }
     }
 }
 
-def sendForUpstreamBuilds(build) {
-    for(cause in build.getBuildCauses()) {
+def sendUpstreamBuildResult(build) {
+    for (cause in build.getBuildCauses()) {
         if (cause._class.contains("UpstreamCause")) {
             def result = getResult(cause)
             send(result)
@@ -62,27 +62,30 @@ def getResult(cause) {
         def upstreamProject = jenkins.getItemByFullName(cause.upstreamProject)
         def upstreamBuild = upstreamProject?.getBuildByNumber(cause.upstreamBuild)
         if (!upstreamProject) {
-            return escapeSpecialLetter("${cause.upstreamProject} not found.")
+            return [
+                title:cause.upstreamProject,
+                message:"Not found.",
+            ]
         } else if (!upstreamBuild) {
             def url = "${jenkins.rootUrl}${upstreamProject.url}"
             def title = "${cause.upstreamProject} #${cause.upstreamBuild}"
 
-            return "[${escapeSpecialLetter(title)}](${url}) ${escapeSpecialLetter("not found.")}"
+            return [
+                title:title,
+                url:url,
+                message:"Not found.",
+            ]
         } else {
             def parameterList = upstreamBuild.getAction(ParametersAction)
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
-            def marker = getMarker(upstreamBuild.result)
+            def marker = getResultMarker(upstreamBuild.result)
             def title = upstreamBuild.fullDisplayName
             def message = "Build ${upstreamBuild.result.toString().toLowerCase()}."
             def elapsed = "${upstreamBuild.durationString} elapsed."
-            def startedBy = "${upstreamBuild.getCauses().collect {"‣ `${it.shortDescription}`"}.join(",\n")}."
-            def parameters = (parameterList ? parameterList.getParameters() : []).collect{param ->
-                return "`‣ ${param.name} : ${param.value} `"
-            }
-            def changes = upstreamBuild.getChangeSets().collect {change ->
-                return change.getItems().collect {item ->
-                    return "`‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail}) `"
-                }
+            def startedBys = upstreamBuild.getCauses().collect{it.shortDescription}
+            def parameters = (parameterList ? parameterList.getParameters() : [])
+            def changes = upstreamBuild.getChangeSets().collect{
+                it.getItems().collect{"${it.commitId.substring(0, 7)} ${it.msg} (by ${it.authorEmail})"}
             }.flatten()
 
             return [
@@ -91,14 +94,17 @@ def getResult(cause) {
                 message: [
                     message,
                     elapsed,
-                    startedBy,
                 ].join("\n"),
-                parameters: parameters,
-                changes: changes,
+                startedBys:startedBys,
+                parameters:parameters,
+                changes:changes,
             ]
         }
     } else {
-        return "Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent."
+        return [
+            title:"Jenkins service has not been started, or was already shut down, or we are running on an unrelated JVM, typically an agent.",
+            message:"Unavailable.",
+        ]
     }
 }
 
@@ -108,33 +114,34 @@ curl 'https://api.telegram.org/bot${params.BOT_API_TOKEN}/sendMessage' \
 -s \
 -X POST \
 -H 'content-type: application/json' \
--d "{
-        \\"chat_id\\":\\"${params.CHAT_ID}\\",
-        \\"parse_mode\\":\\"MarkdownV2\\",
-        \\"text\\":\\"${
-        """
-[${escapeSpecialLetter(result.title)}](${escapeSpecialLetter(result.url)})
-${escapeSpecialLetter(result.message)}
-
-*Build Parameters*
-${!result.parameters ? "" : "${escapeSpecialLetter(result.parameters.join("\n"))}\n"}
-*Changes*
-${escapeSpecialLetter(result.changes.join("\n"))}
-        """
-        }\\"
-    }"
+-d '
+{
+    "chat_id":"${params.CHAT_ID}",
+    "parse_mode":"MarkdownV2",
+    "text":"${[
+        "${result.url ? "[${encodeMarkdownInShell(result.title)}](${encodeMarkdownInShell(result.url)})" : result.title}",
+        "${encodeMarkdownInShell(result.message)}",
+        "${!result.startedBys ? "" : "`${encodeMarkdownInShell(result.startedBys.collect{"‣ ${it}"}.join("\n"))}"}`",
+        " ",
+        "*Build Parameters*",
+        "${!result.parameters ? "" : "`${encodeMarkdownInShell(result.parameters.collect{"‣ ${it.name} : ${it.value}"}.join("\n"))}"}`",
+        " ",
+        "*Changes*",
+        "`${encodeMarkdownInShell(result.changes.collect{"‣ ${it}"}.join("\n"))}`",
+    ].findAll{it}.join("\n")}"
+}'
 """
 }
 
-def escapeSpecialLetter(str) {
+def encodeMarkdownInShell(str) {
     return !str ? "" :
     str.trim()
-    .replaceAll(/(["!\\])/, '\\\\\\\\\\\\$1')
-    .replaceAll(/([#.\-_*|+(){}<>])/, '\\\\\\\\\\\\\\\\$1')
-    .replaceAll(/([`])/, '\\\\$1')
+    .replaceAll(/(['])/, '\\\\$1')
+    .replaceAll(/(["])/, '\\\\\\\\$1')
+    .replaceAll(/([`#.\-_*|+(){}<>\[\]])/, '\\\\\\\\\\\\\$1')
 }
 
-def getMarker(result) {
+def getResultMarker(result) {
     switch (result) {
         case Result.SUCCESS: return "🟢"
         case Result.FAILURE: return "🔴"

@@ -42,22 +42,22 @@ pipeline {
         stage("Send") {
             steps {
                 script {
-                    sendForUpstreamBuilds(currentBuild)
+                    sendUpstreamBuildResult(currentBuild)
                 }
             }
         }
     }
 }
 
-def sendForUpstreamBuilds(build) {
+def sendUpstreamBuildResult(build) {
     for (cause in build.getBuildCauses()) {
         if (cause._class.contains("UpstreamCause")) {
             def result = getResult(cause)
-            send(result, split(params.COMMON_WEB_HOOK_URLS))
+            send(result, splitLines(params.COMMON_WEB_HOOK_URLS))
             if (result.status == Result.SUCCESS) {
-                send(result, split(params.SUCCESS_WEB_HOOK_URLS))
+                send(result, splitLines(params.SUCCESS_WEB_HOOK_URLS))
             } else if (result.status == Result.FAILURE) {
-                send(result, split(params.FAILURE_WEB_HOOK_URLS))
+                send(result, splitLines(params.FAILURE_WEB_HOOK_URLS))
             }
         }
     }
@@ -89,14 +89,10 @@ def getResult(cause) {
             def url = "${jenkins.rootUrl}${upstreamBuild.url}"
             def title = "[${upstreamBuild.result}] ${upstreamBuild.fullDisplayName}"
             def elapsed = "_${upstreamBuild.durationString} elapsed._"
-            def startedBy = "${upstreamBuild.getCauses().collect {"‣ _${it.shortDescription}_"}.join(",\n")}."
-            def parameters = (parameterList ? parameterList.getParameters() : []).collect{param ->
-                return "** ${param.name} **\n${param.value}"
-            }
-            def changes = upstreamBuild.getChangeSets().collect {change ->
-                return change.getItems().collect {item ->
-                    return "‣ ${item.commitId.substring(0, 7)} ${item.msg} (by ${item.authorEmail})"
-                }
+            def startedBy = "${upstreamBuild.getCauses().collect{"‣ _${it.shortDescription}_"}.join(",\n")}."
+            def parameters = (parameterList ? parameterList.getParameters() : [])
+            def changes = upstreamBuild.getChangeSets().collect{
+                it.getItems().collect{"${it.commitId.substring(0, 7)} ${it.msg} (by ${it.authorEmail})"}
             }.flatten()
 
             return [
@@ -122,78 +118,83 @@ def getResult(cause) {
 
 def send(result, webHooks) {
     def color = getStatusColor(result.status)
-    def url = result.url ? result.url : ""
-    def title = escapeSpecialLetter(result.title)
-    def message = escapeSpecialLetter(result.message)
-    def parameters = result.parameters
-    def changes = result.changes
     for (webHook in webHooks) {
-        sh """
-curl ${webHook} \
+        sh """set -x
+curl '${webHook}' \
 -s \
 -X POST \
 -H 'content-type: application/json' \
--d "{
-    \\"blocks\\":[
+-d '
+{
+    "blocks":[
         {
-			\\"type\\":\\"section\\",
-			\\"text\\":{
-				\\"type\\":\\"mrkdwn\\",
-				\\"text\\":\\"*${url ? "<${url}|${title}>" : title}*\\"
-			}
-		}
-    ],
-    \\"attachments\\":[
+            "type":"section",
+            "text":{
+                "type":"mrkdwn",
+                "text":"*${encodeJsonStringInShell(result.url ? "<${result.url}|${result.title}>" : result.title)}*"
+            }
+        }
+   ],
+    "attachments":[
         {
-            \\"color\\":\\"${color}\\",
-            \\"blocks\\":[
-                {
-                    \\"type\\":\\"section\\",
-                    \\"text\\":{
-                        \\"type\\":\\"mrkdwn\\",
-                        \\"text\\":\\"${message}\\"
-                    }
-                },
-                {
-                    \\"type\\":\\"section\\",
-                    \\"text\\":{
-                        \\"type\\":\\"mrkdwn\\",
-                        \\"text\\":\\"*Build Parameters*\\"
-                    }
-                },
-                ${!parameters ? "" :
+            "color":"${color}",
+            "blocks":[
+                ${[
                 """
                 {
-                    \\"type\\":\\"section\\",
-                    \\"text\\":{
-                        \\"type\\":\\"mrkdwn\\",
-                        \\"text\\":\\"${escapeSpecialLetter("```${parameters.join("\n\n")}```")}\\"
+                    "type":"section",
+                    "text":{
+                        "type":"mrkdwn",
+                        "text":"${encodeJsonStringInShell(result.message)}"
                     }
-                },
-                """
                 }
+                """,
+                """
                 {
-                    \\"type\\":\\"section\\",
-                    \\"text\\":{
-                        \\"type\\":\\"mrkdwn\\",
-                        \\"text\\":\\"*Changes*\\"
+                    "type":"section",
+                    "text":{
+                        "type":"mrkdwn",
+                        "text":"*Build Parameters*"
                     }
                 }
-                ${!changes ? "" :
+                """,
+                !result.parameters ? "" :
                 """
-                ,{
-                    \\"type\\":\\"section\\",
-                    \\"text\\":{
-                        \\"type\\":\\"mrkdwn\\",
-                        \\"text\\":\\"${escapeSpecialLetter(changes.join("\n"))}\\"
+                {
+                    "type":"section",
+                    "text":{
+                        "type":"mrkdwn",
+                        "text":"```${encodeJsonStringInShell(
+                            result.parameters.collect{"*** ${it.name} ***\n${it.value}"}.join("\n\n")
+                        )}```"
+                    }
+                }
+                """,
+                """
+                {
+                    "type":"section",
+                    "text":{
+                        "type":"mrkdwn",
+                        "text":"*Changes*"
+                    }
+                }
+                """,
+                !result.changes ? "" :
+                """
+                {
+                    "type":"section",
+                    "text":{
+                        "type":"mrkdwn",
+                        "text":"${encodeJsonStringInShell(result.changes.collect{"‣ ${it}"}.join("\n\n"))}"
                     }
                 }
                 """
-                }
+                ].findAll{it}.join(",")}
             ]
         }
     ]
-}"
+}
+'
 """
     }
 }
@@ -206,13 +207,13 @@ def getStatusColor(status) {
     }
 }
 
-def escapeSpecialLetter(str) {
+def encodeJsonStringInShell(str) {
     return !str ? "" :
         str.trim()
-        .replaceAll(/(["!\\])/, '\\\\\\\\\\\\$1')
-        .replaceAll(/([`])/, '\\\\$1')
+        .replaceAll(/(["\\])/, '\\\\$1')
+        .replaceAll(/(')/, "'\\\\''")
 }
 
-def split(str) {
-    return str ? str.trim().split("\n").findAll {it.trim() ? true : false} : []
+def splitLines(str) {
+    return str ? str.trim().split("\n").findAll{it.trim()} : []
 }
