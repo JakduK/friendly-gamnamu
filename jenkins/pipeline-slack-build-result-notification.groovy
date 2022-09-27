@@ -164,9 +164,7 @@ curl '${webHook}' \
                     "type":"section",
                     "text":{
                         "type":"mrkdwn",
-                        "text":"```${encodeJsonStringInShell(
-                            result.parameters.collect{"*** ${it.name} ***\n${it.value}"}.join("\n\n")
-                        )}```"
+                        "text":"```${encodeJsonStringInShell(formatParameters(result.parameters))}```"
                     }
                 }
                 """,
@@ -185,7 +183,7 @@ curl '${webHook}' \
                     "type":"section",
                     "text":{
                         "type":"mrkdwn",
-                        "text":"${encodeJsonStringInShell(result.changes.collect{"‣ ${it}"}.join("\n\n"))}"
+                        "text":"${encodeJsonStringInShell(formatChanges(result.changes))}"
                     }
                 }
                 """
@@ -216,4 +214,27 @@ def encodeJsonStringInShell(str) {
 
 def splitLines(str) {
     return str ? str.trim().split("\n").findAll{it.trim()} : []
+}
+
+def formatChanges(lines) {
+    def result = []
+    def sum = 20 + lines.size() * 2
+    for (line in lines) {
+        sum += line.length()
+        if (sum > 3000) {
+            break
+        } else {
+            result.add(line)
+        }
+    }
+
+    def formatted = result.collect{"‣ ${it}"}.join("\n\n")
+
+    return result.size() == lines.size()
+        ? formatted
+        : "${formatted}\n\n${lines.size() - result.size()} more changes."
+}
+
+def formatParameters(parameters) {
+    return parameters.collect{"*** ${it.name} ***\n${it.value}"}.join("\n\n")
 }
