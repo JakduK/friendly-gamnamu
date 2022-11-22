@@ -218,7 +218,7 @@ def splitLines(str) {
 
 def formatChanges(lines) {
     def result = []
-    def sum = 20 + lines.size() * 2
+    def sum = 20 + lines.size() * 4
     for (line in lines) {
         sum += line.length()
         if (sum > 3000) {
